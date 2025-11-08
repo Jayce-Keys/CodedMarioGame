@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ultimate Family Mario Party</title>
+<style>
+body{
+  margin:0;
+  font-family:sans-serif;
+  background:url('https://images.unsplash.com/photo-1544971581-7c2b55b41e4f?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  height:100vh;
+}
+#canvas{
+  border:3px solid #fff;
+  background:rgba(0,0,0,0.4);
+}
+#minigameSelect{
+  margin:10px;
+  width:90%;
+  max-width:600px;
+}
+#results{
+  margin-top:10px;
+  font-size:18px;
+}
+</style>
+</head>
+<body>
+<h1>🎄 Ultimate Family Mario Party 🎄</h1>
+<input id="minigameSelect" placeholder="Search minigame...">
+<canvas id="canvas" width="800" height="600"></canvas>
+<div id="results"></div>
+
+<script>
+// ----- Minigame Template -----
+function createMinigame(name){
+  return {
+    name,
+    players: [],
+    state:{},
+    init(players){
+      this.players = players;
+      this.state = { timer: 60, finished:false };
+      players.forEach((p,i)=>{
+        p.score = 0;
+        p.input = {};
+        p.x = 100 + i*150;
+        p.y = 300;
+        p.type = p.type || 'cpu';
+      });
+    },
+    update(dt){
+      this.state.timer -= dt;
+      this.players.forEach(p=>{
+        if(p.type === 'cpu') cpuLogic(p);
+        if(p.input.left) p.x -= 100*dt;
+        if(p.input.right) p.x += 100*dt;
+        if(p.input.up) p.y -= 100*dt;
+        if(p.input.down) p.y += 100*dt;
+        if(p.input.a) p.score += 1*dt;
+        p.x = Math.max(0, Math.min(800, p.x));
+        p.y = Math.max(0, Math.min(600, p.y));
+      });
+      if(this.state.timer <= 0) this.state.finished = true;
+    },
+    draw(ctx){
+      ctx.fillStyle = '#071427';
+      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+      this.players.forEach((p,i)=>{
+        ctx.fillStyle = ['red','blue','green','yellow'][i];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 30,0,2*Math.PI);
+        ctx.fill();
+        ctx.fillStyle='#fff';
+        ctx.font='18px Arial';
+        ctx.fillText(`P${i+1}: ${Math.floor(p.score)}`, p.x-25, p.y-40);
+      });
+      ctx.fillStyle='#fff';
+      ctx.font='24px Arial';
+      ctx.fillText(`Time: ${Math.floor(this.state.timer)}`, 20, 30);
+    },
+    getResults(){
+      return this.players.map(p=>({id:p.id, score: Math.floor(p.score)}));
+    }
+  };
+}
+
+function cpuLogic(player){
+  player.input.left = Math.random()<0.02;
+  player.input.right = Math.random()<0.02;
+  player.input.up = Math.random()<0.02;
+  player.input.down = Math.random()<0.02;
+  player.input.a = Math.random()<0.01;
+}
+
+// ----- 1,174 Numbered Minigames -----
+const minigames = [];
+for(let i=1;i<=1174;i++){
+  minigames.push(createMinigame(`Minigame ${i}`));
+}
+
+// ----- UI & Game Logic -----
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const minigameSelect = document.getElementById('minigameSelect');
+const resultsDiv = document.getElementById('results');
+
+minigames.forEach(m=>{
+  const opt = document.createElement('option');
+  opt.value = m.name;
+  minigameSelect.appendChild(opt);
+});
+
+let players = [
+  {id:1,name:'Player1',type:'human',input:{},score:0},
+  {id:2,name:'CPU2',type:'cpu',input:{},score:0},
+  {id:3,name:'CPU3',type:'cpu',input:{},score:0},
+  {id:4,name:'CPU4',type:'cpu',input:{},score:0}
+];
+
+let currentGame = null;
+
+function startGame(index){
+  currentGame = minigames[index];
+  currentGame.init(players);
+  resultsDiv.innerHTML = '';
+  function loop(){
+    currentGame.update(1/60);
+    currentGame.draw(ctx);
+    if(!currentGame.state.finished) requestAnimationFrame(loop);
+    else showResults();
+  }
+  loop();
+}
+
+function showResults(){
+  const res = currentGame.getResults();
+  resultsDiv.innerHTML = 'Results: ' + res.map(r=>'P'+(players.findIndex(p=>p.id===r.id)+1)+': '+r.score).join(' | ');
+}
+
+// Touch controls: tap canvas to press A
+canvas.addEventListener('touchstart', e=>{
+  players[0].input.a = true;
+});
+canvas.addEventListener('touchend', e=>{
+  players[0].input.a = false;
+});
+
+// Start game when selection changes
+minigameSelect.addEventListener('change', ()=>{
+  const index = minigames.findIndex(m=>m.name === minigameSelect.value);
+  if(index >= 0) startGame(index);
+});
+</script>
+</body>
+</html>
